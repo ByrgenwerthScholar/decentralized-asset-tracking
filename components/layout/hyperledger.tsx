@@ -8,8 +8,10 @@ export default function Hyperledger() {
   const [openPopover, setOpenPopover] = useState(false);
   const [organization, setOrganization] = useState("Organization");
   const assets = ["Asset 1", "Asset 2", "Asset 3", "Asset 4", "Asset 5", "Asset 6", "Asset 7", "Asset 8", "Asset 9", "Asset 10"]
+  const transactions = ["Transaction 1", "Transaction 2", "Transaction 3", "Transaction 4", "Transaction 5", "Transaction 6", "Transaction 7", "Transaction 8", "Transaction 9", "Transaction 10"]
   return (
-      <div className="z-20 my-10 flex flex-col max-w-7xl p-5 px-10 border border-gray-400 animate-fade-up mx-40 rounded-3xl">
+    <>
+      <div className="z-20 my-10 flex flex-col max-w-7xl p-5 px-10 border border-gray-200 bg-white shadow-md animate-fade-up mx-40 rounded-xl">
         <div className="flex flex-row justify-between">
           <div>
             <Popover
@@ -45,19 +47,19 @@ export default function Hyperledger() {
                 />
               </button>
             </Popover> 
-            </div>
-            <div className="flex flex-row gap-1">
-              <button
-                className="flex w-59 items-center bg-black justify-between rounded-md border border-gray-300 px-4 py-2 transition-all duration-75 hover:border-gray-800 focus:outline-none active:bg-gray-100 active:text-black text-white"
-              >
-                Add Asset
-              </button>
-              <button
-                className="flex w-59 items-center bg-black justify-between rounded-md border border-gray-300 px-4 py-2 transition-all duration-75 hover:border-gray-800 focus:outline-none active:bg-gray-100 active:text-black text-white"
-              >
-                Transfer Asset
-              </button>
-            </div>  
+          </div>
+          <div className="flex flex-row gap-1">
+            <button
+              className="flex w-59 items-center border bg-black justify-between rounded-md px-4 py-2 transition-all duration-75 hover:border-gray-800 focus:outline-none active:bg-gray-100 active:text-black text-white"
+            >
+              Add Asset
+            </button>
+            <button
+              className="flex w-59 items-center bg-black justify-between rounded-md border px-4 py-2 transition-all duration-75 hover:border-gray-800 focus:outline-none active:bg-gray-100 active:text-black text-white"
+            >
+              Transfer Asset
+            </button>
+          </div>  
         </div> 
         <div className="relative w-full h-full">
           <div className="flex overflow-x-auto space-x-4 py-2 relative animate-fade-up mt-3 no-scrollbar">
@@ -68,7 +70,20 @@ export default function Hyperledger() {
             ))}
         </div>
         <div className="absolute inset-y-0 right-0 w-20 z-30 gradient-blur backdrop-blur-sm"></div>
+        </div>
       </div>
-    </div>
+      <div className="z-20 mt-0 flex flex-col max-w-7xl p-5 px-10 border border-gray-200 bg-white shadow-md animate-fade-up mx-40 rounded-xl">
+        <div className="relative w-full h-full">
+          <div className="flex overflow-x-auto space-x-4 py-2 relative animate-fade-up mt-3 no-scrollbar">
+            {transactions.map((transaction) => (
+              <div key="{transaction}" className="flex-none w-48 h-40 backdrop-blur-sm hover:backdrop-blur-xl border border-gray-300 rounded-lg flex items-center justify-center">
+                {transaction}
+              </div>
+            ))}
+        </div>
+        <div className="absolute inset-y-0 right-0 w-20 z-30 gradient-blur backdrop-blur-sm"></div>
+        </div>
+      </div>
+    </>
   )
 }
