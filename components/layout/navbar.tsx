@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import useScroll from "@/lib/hooks/use-scroll";
 import { useSignInModal } from "./sign-in-modal";
-import UserDropdown from "./user-dropdown";
+import { Github } from "@/components/shared/icons";
 import { Session } from "next-auth";
 
 export default function NavBar({ session }: { session: Session | null }) {
@@ -32,18 +32,23 @@ export default function NavBar({ session }: { session: Session | null }) {
             ></Image>
             <p>Patriot</p>
           </Link>
-          <div>
-            {session ? (
-              <UserDropdown session={session} />
-            ) : (
-              <button
-                className="rounded-full border border-black bg-black p-1.5 px-4 text-sm text-white transition-all hover:bg-white hover:text-black"
-                onClick={() => setShowSignInModal(true)}
+          <div
+              className="flex animate-fade-up opacity-0"
+              style={{ animationDelay: "0.3s", animationFillMode: "forwards" }}
+            >
+              
+              <a
+                className="flex max-w-fit items-center justify-center space-x-2 rounded-full border border-gray-300 bg-black px-5 py-2 text-sm text-gray-600 shadow-md transition-colors hover:border-gray-800"
+                href="https://github.com/ByrgenwerthScholar"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Sign In
-              </button>
-            )}
-          </div>
+                <Github />
+                <p>
+                  <span className="hidden sm:inline-block text-white">View on GitHub</span>
+                </p>
+              </a>
+            </div>
         </div>
       </div>
     </>
