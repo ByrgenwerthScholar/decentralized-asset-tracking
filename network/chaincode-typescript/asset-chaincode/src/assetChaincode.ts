@@ -13,27 +13,32 @@ import { createHash } from 'crypto';
 export class AssetTransferContract extends Contract {
     
     @Transaction()
-    public async InitTransaction(ctx: Context, buyerMSP: string): Promise<void> {
+    public async InitTransaction(ctx: Context): Promise<void> {
         const user = ctx.clientIdentity.getMSPID();
 
         const assetMap = await ctx.stub.getTransient();
         const asset = JSON.parse(assetMap.get('asset').toString());
-        console.log('Asset: ' + asset.id + ' ' + asset.model + ' ' + asset.size);
+        const buyerMSP = assetMap.get('msp').toString();
+        console.log('msp:' + buyerMSP);
+        console.log('Asset: ' + asset.id + ' ' + asset.model + ' ' + asset.size + '' + asset.accumulator);
 
-        if (!asset || !asset.model || !asset.size) {
+        if (!asset || !asset.model || !asset.size || !asset.accumulator) {
             throw new Error('Asset information is required');
         }
         
         const timestamp = ctx.stub.getTxTimestamp();
-        const parts = timestamp.toString().split(',');
-        const seconds = parseInt(parts[0], 10);
-        const nanos = parseInt(parts[1], 10);
+        const seconds = timestamp.seconds;
+        const nanos = timestamp.nanos;
 
         // Create the Date object
-        const txDate = new Date((seconds * 1000) + (nanos / 1000000));
+        const txDate = new Date((seconds.toNumber() * 1000) + (nanos / 1000000));
 
         // Converting the date to ISO string format
         const date = txDate.toISOString();
+
+        const hash = await ctx.stub.getPrivateDataHash("_implicit_org_" + user, asset.id) as Buffer;
+
+        console.log('Asset Hash: ' + hash.toString());
 
         const newProposal: Proposal = {
             id: "P"+this.generateHash(asset.id),
@@ -44,6 +49,7 @@ export class AssetTransferContract extends Contract {
             model: asset.model,
             size: asset.size,
             accepted: false,
+            assetHash: hash.toString('hex'),
         };
 
         const ownerProposal: Proposal = {
@@ -55,13 +61,9 @@ export class AssetTransferContract extends Contract {
             model: asset.model,
             size: asset.size,
             accepted: true,
+            assetHash: hash.toString('hex'),
         };
-
-        console.log('Verifying asset');
-        const verified = await this.verifyAssetProperties(ctx, asset.id, user); 
-        if (!verified) {
-            throw new Error('Asset verification failed');
-        }
+        
         await ctx.stub.putPrivateData("_implicit_org_" + user, ownerProposal.id, Buffer.from(stringify(sortKeysRecursive(ownerProposal))));
         await ctx.stub.putPrivateData("_implicit_org_" + buyerMSP, newProposal.id, Buffer.from(stringify(sortKeysRecursive(newProposal))));
         console.log('Proposal Id: ' + newProposal.id + ', user: ' + user);
@@ -84,10 +86,11 @@ export class AssetTransferContract extends Contract {
         }
 
         console.log('Verifying asset');
-        const verified = await this.verifyAssetProperties(ctx, proposal.assetId, proposal.seller); 
+        const verified = await this.verifyAssetProperties(ctx, proposal.assetId, proposal.seller, proposal.assetHash); 
         if (!verified) {
             throw new Error('Asset verification failed');
         }
+
         proposal.accepted = true;
         await ctx.stub.putPrivateData("_implicit_org_" + user, proposal.id, Buffer.from(stringify(sortKeysRecursive(proposal))));
         
@@ -117,22 +120,23 @@ export class AssetTransferContract extends Contract {
         await ctx.stub.deletePrivateData("_implicit_org_" + user, id);
     }
 
-    @Transaction()
-    public async ConfirmTransferDetails(ctx: Context, proposalId: string): Promise<boolean> {
+    @Transaction(false)
+    public async CheckProposalAccepted(ctx: Context, proposalIdsJson: string): Promise<string[]> {
+        console.log('Received proposalIds:', proposalIdsJson);
+        const proposalIds: string[] = JSON.parse(proposalIdsJson);
+        
         const user = ctx.clientIdentity.getMSPID();
-        const proposal = await this.GetProposal(ctx, proposalId);
-        if (proposal.seller !== user) {
-            throw new Error(`Proposal ${proposalId} can only be confirmed by ${proposal.seller}`);
+        let proposals: string[] = [];
+        for (let id of proposalIds) {
+            const proposal = await this.GetProposal(ctx, id);
+            if (proposal.seller !== user) {
+                throw new Error(`Proposal ${id} can only be checked by ${proposal.seller}`);
+            }
+            if ( await this.proposalsMatch(ctx, proposal.id, proposal.seller, proposal.buyer)) {
+                proposals.push(proposal.id);
+            }
         }
-        proposal.accepted = true;
-        ctx.stub.putPrivateData("_implicit_org_" + user, proposal.id, Buffer.from(stringify(sortKeysRecursive(proposal))));
-        const eventPayload: Buffer = Buffer.from(`Trade proposal: ${proposal.id} confirmed by ${user}.`);
-        try {
-            ctx.stub.setEvent(`Proposal ${proposal.id} Confirmed`, eventPayload);
-        } catch (err) {
-            throw new Error(`Error emitting event: ${err}`);
-        }
-        return true;
+        return proposals;
     }
 
     @Transaction()
@@ -143,7 +147,7 @@ export class AssetTransferContract extends Contract {
         const asset: Asset = JSON.parse(Map.get('asset').toString());
         const proposal: Proposal = JSON.parse(Map.get('proposal').toString());
 
-        const assetVerified = await this.verifyAssetProperties(ctx, asset.id, user);
+        const assetVerified = await this.verifyAssetProperties(ctx, asset.id, user, proposal.assetHash);
         if (!assetVerified) {
             throw new Error('Asset was changed or could not be verified');
         }
@@ -173,8 +177,12 @@ export class AssetTransferContract extends Contract {
                 model: asset.model,
                 size: asset.size,
                 date: date,
+                verified: false,
             },
         };
+
+        const nonVerifiedTransactions = await ctx.stub.getPrivateData("_implicit_org_" + user, 'nvt');
+        await ctx.stub.putPrivateData("_implicit_org_" + user, 'Verified_Transactions', Buffer.from((parseInt(nonVerifiedTransactions.toString())+1).toString()));
 
         await ctx.stub.putPrivateData("_implicit_org_" + user, newHistory.id, Buffer.from(stringify(sortKeysRecursive(newHistory))));
         await ctx.stub.putPrivateData("_implicit_org_" + proposal.buyer, newHistory.id, Buffer.from(stringify(sortKeysRecursive(newHistory))));
@@ -196,14 +204,23 @@ export class AssetTransferContract extends Contract {
     public async AddAsset(ctx: Context): Promise<void> {
         const user = ctx.clientIdentity.getMSPID();
         const timestamp = ctx.stub.getTxTimestamp();
-        const parts = timestamp.toString().split(',');
-        const seconds = parseInt(parts[0], 10);
-        const nanos = parseInt(parts[1], 10);
+        // const parts = timestamp.toString().split(',');
+        // const seconds = parseInt(parts[0], 10);
+        // const nanos = parseInt(parts[1], 10);
 
-        // Create the Date object
-        const txDate = new Date((seconds * 1000) + (nanos / 1000000));
+        // // Create the Date object
+        // const txDate = new Date((seconds * 1000) + (nanos / 1000000));
 
-        // Converting the date to ISO string format
+        // // Converting the date to ISO string format
+        // const date = txDate.toISOString();
+
+        const seconds = timestamp.seconds;
+        const nanos = timestamp.nanos;
+        console.log('Transaction timestamp:', timestamp);
+        console.log('Seconds:', seconds, 'Nanos:', nanos);
+
+    // Create the Date object from seconds and nanoseconds
+        const txDate = new Date((seconds.toNumber() * 1000) + (nanos / 1000000));
         const date = txDate.toISOString();
 
         const Map = await ctx.stub.getTransient();
@@ -217,7 +234,7 @@ export class AssetTransferContract extends Contract {
         if (isNaN(sizeNumber)) {
             throw new Error(`Size must be a valid number. Received: ${size}`);
         }
-        const response = await ctx.stub.invokeChaincode('CryptoChaincode', ['createNewAccumulator', ''], 'mychannel');
+        let response = await ctx.stub.invokeChaincode('crypto', ['createNewAccumulator', ''], 'mychannel');
 
         if (response.status === 200) {
             // Process the response payload
@@ -227,21 +244,33 @@ export class AssetTransferContract extends Contract {
             throw new Error(`Failed to invoke due to error: ${response.message}`);
         }
         const newAccumulator = response.payload.toString();
-        const newAsset: Asset = {
-            id: assetID,
-            model: model,
-            size: sizeNumber,
-            accumulator: newAccumulator,
-        };
 
         const newHistory: History = {
             id: "H"+this.generateHash(assetID),
             record: {
                 type: 'add',
-                assetId: newAsset.id,
+                assetId: assetID,
                 org: user,
                 date: date,
             },
+        };
+
+        response = await ctx.stub.invokeChaincode('crypto', ['addToAccumulator', newAccumulator, stringify(newHistory)], 'mychannel');
+
+        if (response.status === 200) {
+            // Process the response payload
+            const returnedData = response.payload.toString();  // Convert buffer to string
+            console.log("Returned Data:", returnedData);
+        } else {
+            throw new Error(`Failed to invoke due to error: ${response.message}`);
+        }
+        const updatedAccumulator = response.payload.toString();
+
+        const newAsset: Asset = {
+            id: assetID,
+            model: model,
+            size: sizeNumber,
+            accumulator: updatedAccumulator,
         };
 
         await ctx.stub.putPrivateData("_implicit_org_"+user, newAsset.id, Buffer.from(stringify(sortKeysRecursive(newAsset))));
@@ -253,12 +282,10 @@ export class AssetTransferContract extends Contract {
     public async DeleteAsset(ctx: Context, id: string): Promise<void> {
         const user = ctx.clientIdentity.getMSPID();
         const timestamp = ctx.stub.getTxTimestamp();
-        const parts = timestamp.toString().split(',');
-        const seconds = parseInt(parts[0], 10);
-        const nanos = parseInt(parts[1], 10);
-
+        const seconds = timestamp.seconds;
+        const nanos = timestamp.nanos;
         // Create the Date object
-        const txDate = new Date((seconds * 1000) + (nanos / 1000000));
+        const txDate = new Date((seconds.toNumber() * 1000) + (nanos / 1000000));
 
         // Converting the date to ISO string format
         const date = txDate.toISOString();
@@ -372,12 +399,11 @@ export class AssetTransferContract extends Contract {
 
         const sizes = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
         const timestamp = ctx.stub.getTxTimestamp();
-        const parts = timestamp.toString().split(',');
-        const seconds = parseInt(parts[0], 10);
-        const nanos = parseInt(parts[1], 10);
+        const seconds = timestamp.seconds;
+        const nanos = timestamp.nanos;
 
         // Create the Date object
-        const txDate = new Date((seconds * 1000) + (nanos / 1000000));
+        const txDate = new Date((seconds.toNumber() * 1000) + (nanos / 1000000));
 
         // Converting the date to ISO string format
         const date = txDate.toISOString();
@@ -389,7 +415,7 @@ export class AssetTransferContract extends Contract {
             const sizeNumber = sizes[i];
             const assetID = "A"+this.generateHash(model+sizeNumber.toString());
             
-            const response = await ctx.stub.invokeChaincode('CryptoChaincode', ['createNewAccumulator', ''], 'mychannel');
+            let response = await ctx.stub.invokeChaincode('crypto', ['createNewAccumulator', ''], 'mychannel');
 
             if (response.status === 200) {
                 // Process the response payload
@@ -399,13 +425,6 @@ export class AssetTransferContract extends Contract {
                 throw new Error(`Failed to invoke due to error: ${response.message}`);
             }
             const newAccumulator = response.payload.toString();
-
-            const newAsset: Asset = {
-                id: assetID,
-                model: model,
-                size: sizeNumber,
-                accumulator: newAccumulator,
-            };
 
             const newHistory: History = {
                 id: "H"+this.generateHash(assetID),
@@ -417,13 +436,49 @@ export class AssetTransferContract extends Contract {
                 },
             };
 
+            response = await ctx.stub.invokeChaincode('crypto', ['addToAccumulator', newAccumulator, stringify(newHistory)], 'mychannel');
+
+            if (response.status === 200) {
+                // Process the response payload
+                const returnedData = response.payload.toString();  // Convert buffer to string
+                console.log("Returned Data:", returnedData);
+            } else {
+                throw new Error(`Failed to invoke due to error: ${response.message}`);
+            }
+            const updatedAccumulator = response.payload.toString();
+
+            const newAsset: Asset = {
+                id: assetID,
+                model: model,
+                size: sizeNumber,
+                accumulator: updatedAccumulator,
+            };
+
+            
+
             console.log('Adding asset: ' + newAsset.id + ' ' + newAsset.model + ' ' + newAsset.size);
             // Note: sortKeysRecursive and stringify need to be implemented
             await ctx.stub.putPrivateData("_implicit_org_" + user, newAsset.id, Buffer.from(stringify(sortKeysRecursive(newAsset)))); 
             await ctx.stub.putPrivateData("_implicit_org_" + user, newHistory.id, Buffer.from(stringify(sortKeysRecursive(newHistory))));
         }
-
+        await ctx.stub.putPrivateData("_implicit_org_" + user, 'nvt', Buffer.from('0')); 
         console.info('Initialized ledger with 10 assets.');
+    }
+
+    @Transaction()
+    async VerifyTransaction(ctx: Context, id: string): Promise<boolean> {
+        const user = ctx.clientIdentity.getMSPID();
+        const history = await this.GetHistory(ctx, id);
+        if (history.record.type !== 'transaction') {
+            throw new Error(`History ${id} is not a transaction.`);
+        }
+        if (history.record.fromOrg !== user) {
+            throw new Error(`Transaction ${id} can only be verified by ${history.record.fromOrg}`);
+        }
+        history.record.verified = true;
+        await ctx.stub.putPrivateData("_implicit_org_" + user, history.id, Buffer.from(stringify(sortKeysRecursive(history))));
+        
+        return true;
     }
 
     async getAllResults(promiseOfIterator) {
@@ -452,7 +507,7 @@ export class AssetTransferContract extends Contract {
         // Check for asset properties in transient data
         const immutablePropertiesJSON = sortKeysRecursive(transMap.get('proposal'));
         if (!immutablePropertiesJSON) {
-            throw new Error('asset_properties key not found in the transient map');
+            throw new Error('properties key not found in the transient map');
         }
 
         const collectionSeller = "_implicit_org_" + seller; 
@@ -489,26 +544,58 @@ export class AssetTransferContract extends Contract {
         if (!calculatedPropertiesHash.equals(buyerHash)) {
             throw new Error(`proposal with hash ${calculatedPropertiesHash.toString('hex')} does not match buyer on-chain hash ${buyerHash.toString('hex')}`);
         }
-        
+
+        const nvt = await stub.getPrivateData(collectionSeller, 'nvt');
+        if (parseInt(nvt.toString()) > 2) {
+            throw new Error(`3 or more non-verified transactions for seller: ${seller}. Please verify past transactions before proceeding.`);
+        }
+
+        return true;
+    }
+
+    async proposalsMatch(ctx: Context, proposalId: string, seller: string, buyer: string): Promise<boolean> {
+        const stub = ctx.stub;
+        const collectionSeller = "_implicit_org_" + seller;
+        const collectionBuyer = "_implicit_org_" + buyer;
+    
+        let buyerHash;
+        let sellerHash;
+    
+        try {
+            buyerHash = await stub.getPrivateDataHash(collectionBuyer, proposalId);
+            if (!buyerHash) {
+                throw new Error(`Buyer asset private properties hash does not exist: ${proposalId}`);
+            }
+            console.log('Buyer Hash:', buyerHash.toString('hex'));
+        } catch (err) {
+            console.error(`Failed to read asset private properties hash from buyer's collection: ${err.message}`);
+            throw new Error(`Failed to read asset private properties hash from buyer's collection: ${err}`);
+        }
+    
+        console.log('Seller:', seller);
+        console.log('Proposal ID:', proposalId);
+    
+        try {
+            sellerHash = await stub.getPrivateDataHash(collectionSeller, proposalId);
+            if (!sellerHash) {
+                throw new Error(`Seller asset private properties hash does not exist: ${proposalId}`);
+            }
+            console.log('Seller Hash:', sellerHash.toString('hex'));
+        } catch (err) {
+            console.error(`Failed to read asset private properties hash from seller's collection: ${err.message}`);
+            throw new Error(`Failed to read asset private properties hash from seller's collection: ${err}`);
+        }
+    
+        if (!sellerHash.equals(buyerHash)) {
+            throw new Error(`Proposal hash mismatch: seller hash ${sellerHash.toString('hex')} does not match buyer hash ${buyerHash.toString('hex')}`);
+        }
+    
         return true;
     }
     
-    async verifyAssetProperties(ctx: Context, assetID: string, owner: string): Promise<boolean> {
+    
+    async verifyAssetProperties(ctx: Context, assetID: string, owner: string, proposalHash:string): Promise<boolean> {
         const stub = ctx.stub;
-
-        // Get transient data
-        let transMap;
-        try {
-            transMap = stub.getTransient();
-        } catch (err) {
-            throw new Error(`error getting transient: ${err}`);
-        }
-
-        // Check for asset properties in transient data
-        const immutablePropertiesJSON = sortKeysRecursive(transMap.get('asset'));
-        if (!immutablePropertiesJSON) {
-            throw new Error('asset_properties key not found in the transient map');
-        }
 
 
         const collectionOwner = "_implicit_org_" + owner; // Assuming ownerOrg property and buildCollectionName method exist
@@ -524,13 +611,11 @@ export class AssetTransferContract extends Contract {
         }
         
         // Calculate hash of the immutable properties
-        const hash = createHash('sha256');
-        hash.update(immutablePropertiesJSON);
-        const calculatedPropertiesHash = hash.digest();
+        const hash = Buffer.from(proposalHash, 'hex');
 
         // Verify that the calculated hash matches the on-chain hash
-        if (!calculatedPropertiesHash.equals(immutablePropertiesOnChainHash)) {
-            throw new Error(`transient asset hash ${calculatedPropertiesHash.toString('hex')} does not match on-chain asset hash ${immutablePropertiesOnChainHash.toString('hex')}`);
+        if (!hash.equals(immutablePropertiesOnChainHash)) {
+            throw new Error(`transient asset hash ${hash.toString('hex')} does not match on-chain asset hash ${immutablePropertiesOnChainHash.toString('hex')}`);
         }
         
         return true;

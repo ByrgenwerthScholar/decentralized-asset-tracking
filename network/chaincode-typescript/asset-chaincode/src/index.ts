@@ -7,3 +7,4 @@ import {AssetTransferContract} from './assetChaincode';
 export {AssetTransferContract} from './assetChaincode';
 
 export const contracts: any[] = [AssetTransferContract];
+ 

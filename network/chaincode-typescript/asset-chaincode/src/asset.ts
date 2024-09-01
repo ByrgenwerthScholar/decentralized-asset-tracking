@@ -14,6 +14,7 @@ export class Proposal {
     model: string;
     size: string; 
     accepted: boolean;
+    assetHash: string;
 }
 
 @Object()
@@ -56,6 +57,7 @@ interface TransactionRecord {
   model: string;
   size: number;
   date: string;
+  verified: boolean;
 }
 
 interface DeleteRecord {

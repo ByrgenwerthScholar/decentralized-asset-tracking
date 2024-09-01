@@ -2,7 +2,7 @@
     "compilerOptions": {
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "outDir": "dist",
+        "outDir": "./dist",
         "target": "es2017",
         "moduleResolution": "node",
         "module": "commonjs",

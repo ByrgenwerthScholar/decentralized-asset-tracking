@@ -1,96 +1,82 @@
 export class Asset {
 
-    public ID!: string;
+    public id!: string;
   
-    public CurrentOwner!: string;
+    public model!: string;
 
-    public Model!: string;
+    public size!: number;
 
-    public Batch?: Batch;
+    public accumulator: string;
 
-    constructor(id: string, currentOwner: string, model: string, batch?: Batch) {
-        this.ID = id;
-        this.CurrentOwner = currentOwner;
-        this.Model = model;
-        this.Batch = batch;
+    constructor(id: string, model: string, size: number, accumulator: string) {
+        this.id = id;
+        this.model = model;
+        this.size = size;
+        this.accumulator = accumulator;
     }
 }
 
-export class Batch {
+export class Proposal {
+    public id: string;
+    public date: string;
+    public assetId: string;
+    public seller: string;
+    public buyer: string;
+    public model: string;
+    public size: string; 
+    public accepted: boolean;
+    public assetHash: string;
+    public response?: boolean;
 
-    public ID!: string;
-
-    public Size!: number;
-
-    public SubBatches!: SubBatch[] | null;
-
-    constructor(id: string, size: number, subBatches: SubBatch[] | null) { 
-        this.ID = id;
-        this.Size = size;
-        this.SubBatches = subBatches;
+    constructor(id: string, date: string, assetId: string, seller: string, buyer: string, model: string, size: string, accepted: boolean, assetHash: string) {
+        this.id = id;
+        this.date = date;
+        this.assetId = assetId;
+        this.seller = seller;
+        this.buyer = buyer;
+        this.model = model;
+        this.size = size;
+        this.accepted = accepted;
+        this.assetHash = assetHash;
     }
 }
 
-export class SubBatch {
+export class History {
 
-  public ID!: string;
+  public id: string;
 
-  public Size!: number;
+  public record: Record;
 
-  public History!: Record[];
-
-  constructor(id: string, size: number, history: Record[]) {
-    this.ID = id;
-    this.Size = size;
-    this.History = history;
-  }
+  constructor(id: string, record: Record) {
+    this.id = id;
+    this.record = record;
+}
 }
 
-interface CreateRecord {
-  type: "create";
-  id: string;
-  batchid: string;
+
+interface AddRecord {
+  type: "add";
+  assetId: string;
   org: string;
-  date: Date;
-
+  date: string;
 }
 
 interface TransactionRecord {
   type: "transaction";
-  id: string;
   fromOrg: string; 
   toOrg: string;
+  model: string;
   size: number;
-  date: Date;
+  date: string;
+  verified: boolean;
 }
 
-interface SplitRecord {
-  type: "split";
+interface DeleteRecord {
+  type: "delete";
   id: string;
   org: string;
-  fromBatch: string;
-  batch1amount: number;
-  batch2amount: number;
-  date: Date;
-}
-
-interface CombineRecord {
-  type: "combine";
-  id: string;
-  org: string;
-  fromBatch1: string;
-  fromBatch2: string;
-  batch1History: Record[];
-  batch2History: Record[];
-  date: Date;
+  date: string;
 }
 
 // Union type for the record
-type RecordType = TransactionRecord | SplitRecord | CombineRecord | CreateRecord;
-
-class Record {
-  public data!: RecordType;
-  constructor(data: RecordType) {
-    this.data = data;
-  }
-}
+type Record = TransactionRecord | AddRecord | DeleteRecord;

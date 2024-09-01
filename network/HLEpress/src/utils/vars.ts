@@ -10,9 +10,9 @@ const mspId2 = 'Org2MSP';
 const mspId3 = 'Org3MSP';
 
 // Path to crypto materials.
-const cryptoPath1 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
-const cryptoPath2 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', 'test-network', 'organizations', 'peerOrganizations', 'org2.example.com'));
-const cryptoPath3 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', 'test-network', 'organizations', 'peerOrganizations', 'org3.example.com'));
+const cryptoPath1 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', '../', '../', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
+const cryptoPath2 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', '../', '../', 'test-network', 'organizations', 'peerOrganizations', 'org2.example.com'));
+const cryptoPath3 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', '../', '../', 'test-network', 'organizations', 'peerOrganizations', 'org3.example.com'));
 
 // Path to user private key directory.
 const keyDirectoryPath1 = envOrDefault('KEY_DIRECTORY_PATH', path.resolve(cryptoPath1, 'users', 'User1@org1.example.com', 'msp', 'keystore'));

@@ -2,7 +2,7 @@
 import express from 'express';
 import { connect } from '@hyperledger/fabric-gateway';
 const router = express.Router();
-import { channelName, chaincodeName, utf8Decoder, newGrpcConnection3, newIdentity3, newSigner3, displayInputParameters3} from './vars';
+import { channelName, chaincodeName, utf8Decoder, newGrpcConnection3, newIdentity3, newSigner3, displayInputParameters3} from './utils/vars';
 
 router.get('/getallhistories', async (req, res) => {
   await displayInputParameters3();

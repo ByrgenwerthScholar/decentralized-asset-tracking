@@ -6,6 +6,7 @@ import useScroll from "@/lib/hooks/use-scroll";
 import { useSignInModal } from "./sign-in-modal";
 import { Github } from "@/components/shared/icons";
 import { Session } from "next-auth";
+import PlaidLinkButton from "@/components/home/plaid";
 
 export default function NavBar({ session }: { session: Session | null }) {
   const { SignInModal, setShowSignInModal } = useSignInModal();
@@ -32,6 +33,7 @@ export default function NavBar({ session }: { session: Session | null }) {
             ></Image>
             <p>Patriot</p>
           </Link>
+          <PlaidLinkButton />
           <div
               className="flex animate-fade-up opacity-0"
               style={{ animationDelay: "0.3s", animationFillMode: "forwards" }}

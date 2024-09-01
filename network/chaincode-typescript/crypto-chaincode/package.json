@@ -2,8 +2,8 @@
     "name": "crypto-basic",
     "version": "1.0.0",
     "description": "crypto helper functions for main fabric chaincode",
-    "main": "dist/index.js",
-    "typings": "dist/index.d.ts",
+    "main": "dist/cryptoChaincode.js",
+    "typings": "dist/cryptoChaincode.d.ts",
     "engines": {
         "node": ">=12",
         "npm": ">=5"
@@ -12,7 +12,7 @@
         "lint": "tslint -c tslint.json 'src/**/*.ts'",
         "pretest": "npm run lint",
         "test": "nyc mocha -r ts-node/register src/**/*.spec.ts",
-        "start": "set -x node ",
+        "start": "set -x && node dist/cryptoChaincode.js",
         "build": "tsc",
         "build:watch": "tsc -w",
         "prepublishOnly": "npm run build",

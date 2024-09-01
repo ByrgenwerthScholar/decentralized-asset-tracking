@@ -2,8 +2,7 @@ import stringify from 'json-stringify-deterministic';
 import * as mcl from 'mcl-wasm';
 const shim = require('fabric-shim');
 
-
-export const CryptoChaincode = class {
+const CryptoChaincode = class {
 
   constructor() {
     this.initCryptoSystem();
@@ -14,21 +13,30 @@ export const CryptoChaincode = class {
     console.log('Crypto system initialized.');
   }
 
-  createNewAccumulator() {
-    const newAccumulator = new mcl.G1();
-    const newAccumulatorHex = this.serializeAccumulator(newAccumulator); // This will store your path accumulation
-    return newAccumulatorHex;
+  async createNewAccumulator() {
+    const g1 = new mcl.G1();
+    const g2 = new mcl.G2();
+    const g1Hex = this.serializeAccumulator(g1);
+    const g2Hex = this.serializeAccumulator(g2);
+    try {
+      await shim.putState('g2', Buffer.from(g2Hex));
+    } catch (err) {
+      console.log('Error storing g2 accumulator in cryptoChaincode: ', err);
+    }
+    console.log('Successfully created new accumulator...');
+    return g1Hex;
   }
 
   addToAccumulator(accumulatorHex: string, data: string) {
-    let newEntry = mcl.hashAndMapToG1(stringify(data));
+    console.log('Adding to accumulator... string: ', accumulatorHex, ' data: ', data);
+    let newEntry = mcl.hashAndMapToG1(data);
     let accumulator = this.deserializeAccumulator(accumulatorHex);
     accumulator = mcl.add(accumulator, newEntry);
     const newAccumulatorHex = this.serializeAccumulator(accumulator);
     return newAccumulatorHex;
   }
 
-  serializeAccumulator(accumulator: mcl.G1): string {
+  serializeAccumulator(accumulator: mcl.G1 | mcl.G2): string {
     const serializedData = accumulator.serializeToHexStr();
     return serializedData;
   }
@@ -50,7 +58,8 @@ export const CryptoChaincode = class {
 
         switch (fcn) {
             case 'createNewAccumulator':
-                return shim.success(await this.createNewAccumulator());
+              const newAccumulator = this.createNewAccumulator();
+              return shim.success(Buffer.from(newAccumulator));
             case 'addToAccumulator':
               if (params.length < 2) {
                 return shim.error('addToAccumulator expects two arguments: accumulatorHex and data');
@@ -65,7 +74,6 @@ export const CryptoChaincode = class {
         }
     }
 	
-
 }
 
 shim.start(new CryptoChaincode());
