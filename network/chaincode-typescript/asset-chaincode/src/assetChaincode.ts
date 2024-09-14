@@ -85,7 +85,7 @@ export class AssetTransferContract extends Contract {
             throw new Error(`Proposal ${id} can only be accepted by ${proposal.buyer}`);
         }
 
-        console.log('Verifying asset');
+        // checking thatx
         const verified = await this.verifyAssetProperties(ctx, proposal.assetId, proposal.seller, proposal.assetHash); 
         if (!verified) {
             throw new Error('Asset verification failed');

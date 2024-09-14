@@ -1,4 +1,8 @@
-package main
+package chaincode
+
+import (
+	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+)
 
 // Proposal represents a proposal in the blockchain
 type Proposal struct {
@@ -17,19 +21,19 @@ type Proposal struct {
 type Asset struct {
 	ID          string `json:"id"`
 	Model       string `json:"model"`
-	Size        int    `json:"size"`
+	Size        string   `json:"size"`
 	Accumulator string `json:"accumulator"`
 }
 
 // History represents the history of an asset
 type History struct {
 	ID     string `json:"id"`
-	Record Record `json:"record"`
+	Type  string `json:"type"`
+	Record interface{} `json:"record"`
 }
 
 // AddRecord represents a record of an asset addition
 type AddRecord struct {
-	Type   string `json:"type"` // "add"
 	AssetID string `json:"assetId"`
 	Org    string `json:"org"`
 	Date   string `json:"date"`
@@ -37,22 +41,28 @@ type AddRecord struct {
 
 // TransactionRecord represents a record of an asset transaction
 type TransactionRecord struct {
-	Type    string `json:"type"` // "transaction"
 	FromOrg string `json:"fromOrg"`
 	ToOrg   string `json:"toOrg"`
 	Model   string `json:"model"`
-	Size    int    `json:"size"`
+	Size    string    `json:"size"`
 	Date    string `json:"date"`
 	Verified bool  `json:"verified"`
 }
 
 // DeleteRecord represents a record of an asset deletion
 type DeleteRecord struct {
-	Type string `json:"type"` // "delete"
 	ID   string `json:"id"`
 	Org  string `json:"org"`
 	Date string `json:"date"`
 }
 
-// Record is a union type for different types of records
-type Record interface{}
+// In your chaincode package
+type ProposalGetter interface {
+	GetProposal(ctx contractapi.TransactionContextInterface, id string) (*Proposal, error)
+}
+
+type ProposalMatcher interface {
+	ProposalsMatch(ctx contractapi.TransactionContextInterface, id, seller, buyer string) (bool, error)
+}
+
+
