@@ -13,12 +13,6 @@ The main features include:
 This project is still **a work in progress** and is not yet ready for easy installation.
 
 ## Features
-
-- **Chaincode Functions**:
-    - **InitLedger**: Initializes the ledger with sample assets and sets up the private collections.
-    - **AcceptProposal**: Allows the buyer to accept a proposal after verifying asset details.
-    - **CheckProposalAccepted**: Checks if a proposal has been accepted by verifying transaction details.
-    - **VerifyAssetProperties**: Ensures that the asset data is valid using a cryptographic hash.
   
 - **Private Data Handling**: The chaincode stores sensitive information such as asset details and ownership in **private data collections**, ensuring that only the involved parties can access specific data.
 
@@ -27,11 +21,6 @@ This project is still **a work in progress** and is not yet ready for easy insta
 ## Usage
 
 The chaincode is primarily designed to be deployed on a **Hyperledger Fabric** network. It allows organizations to securely propose and accept asset transfers while ensuring that only the concerned organizations have access to sensitive information about the assets.
-
-**Key Chaincode Methods**:
-- **InitLedger**: Initializes the ledger and creates sample assets.
-- **AcceptProposal**: Buyers can accept proposals made by sellers.
-- **CheckProposalAccepted**: Check the status of a proposal to ensure it has been accepted.
 
 ## Testing
 
@@ -47,8 +36,10 @@ The tests cover:
 ## Future Work
 
 - **Installation**: The project is not yet ready for easy installation, but it is under active development.
-- **Integration Testing**: We plan to add full integration tests with a Hyperledger Fabric network.
-- **Improved Documentation**: Further documentation on deploying and using the chaincode will be added in the near future.
+- **Electron Front-End**: Moving from Next.js web based front end
+to Electron multi-platform application.
+- **Chaincode functions to track illegal and under-the-table trade patterns**: Chaincode functions to automatically detect suspicious 
+trade patterns. This will involve ZKPs and accumulators for persistent but private data.
 
 ## Contact
 

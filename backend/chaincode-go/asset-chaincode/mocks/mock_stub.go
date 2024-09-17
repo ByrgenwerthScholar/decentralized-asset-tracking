@@ -4,7 +4,7 @@ import (
     "github.com/stretchr/testify/mock"
     "github.com/hyperledger/fabric-protos-go/peer"
 		"github.com/hyperledger/fabric-chaincode-go/shim"
-    "google.golang.org/protobuf/types/known/timestamppb" 
+    "github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // MockStub is a mock implementation of the StubInterface.
@@ -13,18 +13,31 @@ type MockStub struct {
 }
 
 func (m *MockStub) GetTransient() (map[string][]byte, error) {
-    args := m.Called()
-    return args.Get(0).(map[string][]byte), args.Error(1)
+	args := m.Called()
+	var transientMap map[string][]byte
+	if args.Get(0) != nil {
+			transientMap = args.Get(0).(map[string][]byte)
+	}
+	return transientMap, args.Error(1)
 }
 
-func (m *MockStub) GetTxTimestamp() (*timestamppb.Timestamp, error) {
-    args := m.Called()
-    return args.Get(0).(*timestamppb.Timestamp), args.Error(1)
+
+func (m *MockStub) GetTxTimestamp() (*timestamp.Timestamp, error) {
+	args := m.Called()
+	var ts *timestamp.Timestamp
+	if args.Get(0) != nil {
+			ts = args.Get(0).(*timestamp.Timestamp)
+	}
+	return ts, args.Error(1)
 }
 
 func (m *MockStub) GetPrivateData(collection string, key string) ([]byte, error) {
-    args := m.Called(collection, key)
-    return args.Get(0).([]byte), args.Error(1)
+	args := m.Called(collection, key)
+	var data []byte
+	if args.Get(0) != nil {
+			data = args.Get(0).([]byte)
+	}
+	return data, args.Error(1)
 }
 
 func (m *MockStub) GetPrivateDataHash(collection string, key string) ([]byte, error) {

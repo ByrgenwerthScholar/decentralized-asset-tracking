@@ -13,7 +13,7 @@ import (
 )
 
 // verifyProposalProperties verifies the properties of a proposal.
-func verifyProposalProperties(ctx contractapi.TransactionContextInterface, proposalId, seller, buyer string) (bool, error) {
+func (c *AssetTransferContract) VerifyProposalProperties(ctx contractapi.TransactionContextInterface, proposalId, seller, buyer string) (bool, error) {
 	stub := ctx.GetStub()
 
 	transMap, err := stub.GetTransient()
@@ -21,7 +21,7 @@ func verifyProposalProperties(ctx contractapi.TransactionContextInterface, propo
 			return false, fmt.Errorf("error getting transient data: %v", err)
 	}
 
-	immutablePropertiesJSON := sortKeys(transMap["proposal"])
+	immutablePropertiesJSON := SortKeys(transMap["proposal"])
 	if immutablePropertiesJSON == nil {
 			return false, fmt.Errorf("properties key not found in the transient map")
 	}
@@ -45,7 +45,7 @@ func verifyProposalProperties(ctx contractapi.TransactionContextInterface, propo
 			return false, fmt.Errorf("private data hash does not exist in seller's collection: %s", proposalId)
 	}
 
-	jsonData, err := json.Marshal(sortKeys(immutablePropertiesJSON))
+	jsonData, err := json.Marshal(SortKeys(immutablePropertiesJSON))
 	if err != nil {
 			return false, fmt.Errorf("failed to marshal JSON: %v", err)
 	}
@@ -107,7 +107,7 @@ func (c *AssetTransferContract) ProposalsMatch(ctx contractapi.TransactionContex
 }
 
 // verifyAssetProperties verifies the properties of an asset.
-func verifyAssetProperties(ctx contractapi.TransactionContextInterface, assetID, owner, assetHash string) (bool, error) {
+func (c *AssetTransferContract) VerifyAssetProperties(ctx contractapi.TransactionContextInterface, assetID, owner, assetHash string) (bool, error) {
 	stub := ctx.GetStub()
 	collectionOwner := "_implicit_org_" + owner
 
@@ -131,14 +131,14 @@ func verifyAssetProperties(ctx contractapi.TransactionContextInterface, assetID,
 	return true, nil
 }
 
-func generateHash(input string) string {
+func GenerateHash(input string) string {
 	h := sha256.New()
 	h.Write([]byte(input))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func putPrivateData(ctx contractapi.TransactionContextInterface, collection, key string, data interface{}) error {
-	jsonData, err := json.Marshal(sortKeys(data))
+func (c *AssetTransferContract) PutPrivateData(ctx contractapi.TransactionContextInterface, collection, key string, data interface{}) error {
+	jsonData, err := json.Marshal(SortKeys(data))
 	if err != nil {
 			return fmt.Errorf("failed to marshal data: %v", err)
 	}
@@ -151,7 +151,7 @@ func putPrivateData(ctx contractapi.TransactionContextInterface, collection, key
 	return nil
 }
 
-func sortKeys(data interface{}) interface{} {
+func SortKeys(data interface{}) interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:
 		sortedData := make(map[string]interface{})
@@ -165,7 +165,7 @@ func sortKeys(data interface{}) interface{} {
 
 		// Add sorted keys to the new map
 		for _, key := range keys {
-			sortedData[key] = sortKeys(v[key]) // Recursive sort for nested maps
+			sortedData[key] = SortKeys(v[key]) // Recursive sort for nested maps
 		}
 		return sortedData
 
@@ -175,7 +175,7 @@ func sortKeys(data interface{}) interface{} {
 	}
 }
 
-func getAllResults(iterator shim.StateQueryIteratorInterface) ([]string, error) {
+func GetAllResults(iterator shim.StateQueryIteratorInterface) ([]string, error) {
 	var results []string
 
 	for iterator.HasNext() {
@@ -190,7 +190,7 @@ func getAllResults(iterator shim.StateQueryIteratorInterface) ([]string, error) 
 	return results, nil
 }
 
-func sortedMarshal(data interface{}) ([]byte, error) {
-	sortedData := sortKeys(data)
+func SortedMarshal(data interface{}) ([]byte, error) {
+	sortedData := SortKeys(data)
 	return json.Marshal(sortedData)
 }

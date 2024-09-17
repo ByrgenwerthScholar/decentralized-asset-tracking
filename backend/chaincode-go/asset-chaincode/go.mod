@@ -8,10 +8,11 @@ require (
 	github.com/hyperledger/fabric-contract-api-go v1.2.2
 	github.com/hyperledger/fabric-protos-go v0.3.0
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/protobuf v1.31.0
+	
 )
 
 require (
+	google.golang.org/protobuf v1.31.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect

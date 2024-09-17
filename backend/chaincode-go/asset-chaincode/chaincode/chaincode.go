@@ -15,14 +15,20 @@ import (
 
 type AssetTransferContract struct {
 	contractapi.Contract
+	PrivateDataWriter
 	ProposalGetter
 	ProposalMatcher
+	AssetVerifier
+  ProposalVerifier
 }
 
 func NewAssetTransferContract() *AssetTransferContract {
 	contract := new(AssetTransferContract)
+	contract.PrivateDataWriter = contract
 	contract.ProposalGetter = contract
 	contract.ProposalMatcher = contract
+	contract.AssetVerifier = contract
+	contract.ProposalVerifier = contract
 	return contract
 }
 
@@ -64,7 +70,7 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 	for i := 0; i < 10; i++ {
 		model := models[i]
 		sizeNumber := sizes[i]
-		assetID := "A" + generateHash(model+fmt.Sprintf("%d", sizeNumber))
+		assetID := "A" + GenerateHash(model+fmt.Sprintf("%d", sizeNumber))
 
 		// Invoke 'createNewAccumulator' on 'crypto' chaincode
 		response := ctx.GetStub().InvokeChaincode("crypto", [][]byte{
@@ -80,7 +86,7 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 
 		// Create new history record
 		newHistory := History{
-			ID: "H" + generateHash(assetID),
+			ID: "H" + GenerateHash(assetID),
 			Type:    "add",
 			Record: AddRecord {
 				AssetID: assetID,
@@ -90,7 +96,7 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 		}
 
 		// Prepare history JSON
-		newHistoryJSON, err := sortedMarshal(newHistory)
+		newHistoryJSON, err := SortedMarshal(newHistory)
 		if err != nil {
 			return fmt.Errorf("failed to marshal new history: %v", err)
 		}
@@ -117,7 +123,7 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 		}
 
 		// Prepare asset JSON
-		newAssetJSON, err := sortedMarshal(newAsset)
+		newAssetJSON, err := SortedMarshal(newAsset)
 		if err != nil {
 			return fmt.Errorf("failed to marshal new asset: %v", err)
 		}
@@ -184,7 +190,7 @@ func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionConte
     }
 
     newProposal := Proposal{
-        ID:        "P" + generateHash(asset.ID),
+        ID:        "P" + GenerateHash(asset.ID),
         Date:      txDate,
         AssetID:   asset.ID,
         Seller:    user,
@@ -196,7 +202,7 @@ func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionConte
     }
 
     ownerProposal := Proposal{
-        ID:        "P" + generateHash(asset.ID),
+        ID:        "P" + GenerateHash(asset.ID),
         Date:      txDate,
         AssetID:   asset.ID,
         Seller:    user,
@@ -207,21 +213,21 @@ func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionConte
         AssetHash: fmt.Sprintf("%x", assetHash),
     }
 
-		ownerProposalJSON, err := json.Marshal(sortKeys(ownerProposal))
+		ownerProposalJSON, err := json.Marshal(SortKeys(ownerProposal))
 		if err != nil {
 			return fmt.Errorf("failed to marshal owner proposal: %v", err)
 		}
 
-		newProposalJSON, err := json.Marshal(sortKeys(newProposal))
+		newProposalJSON, err := json.Marshal(SortKeys(newProposal))
 		if err != nil {
 			return fmt.Errorf("failed to marshal new proposal: %v", err)
 		}
 
-    err = putPrivateData(ctx, "_implicit_org_"+user, ownerProposal.ID, ownerProposalJSON)
+    err = c.PutPrivateData(ctx, "_implicit_org_"+user, ownerProposal.ID, ownerProposalJSON)
     if err != nil {
         return err
     }
-    err = putPrivateData(ctx, "_implicit_org_"+buyerMSP, newProposal.ID, newProposalJSON)
+    err = c.PutPrivateData(ctx, "_implicit_org_"+buyerMSP, newProposal.ID, newProposalJSON)
     if err != nil {
         return err
     }
@@ -247,13 +253,13 @@ func (c *AssetTransferContract) AcceptProposal(ctx contractapi.TransactionContex
     }
 
 		// Checking that the asset was not changed since the proposal was created
-    verified, err := verifyAssetProperties(ctx, proposal.AssetID, proposal.Seller, proposal.AssetHash)
+    verified, err := c.VerifyAssetProperties(ctx, proposal.AssetID, proposal.Seller, proposal.AssetHash)
     if err != nil || !verified {
         return fmt.Errorf("asset verification failed")
     }
 
     proposal.Accepted = true
-    err = putPrivateData(ctx, "_implicit_org_"+user, proposal.ID, proposal)
+    err = c.PutPrivateData(ctx, "_implicit_org_"+user, proposal.ID, proposal)
     if err != nil {
         return err
     }
@@ -322,12 +328,12 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 			return fmt.Errorf("failed to unmarshal proposal JSON: %v", err)
 	}
 
-	assetVerified, err := verifyAssetProperties(ctx, asset.ID, user, proposal.AssetHash)
+	assetVerified, err := c.AssetVerifier.VerifyAssetProperties(ctx, asset.ID, user, proposal.AssetHash)
 	if err != nil || !assetVerified {
 			return fmt.Errorf("asset verification failed: %v", err)
 	}
 
-	proposalVerified, err := verifyProposalProperties(ctx, proposal.ID, proposal.Seller, proposal.Buyer)
+	proposalVerified, err := c.ProposalVerifier.VerifyProposalProperties(ctx, proposal.ID, proposal.Seller, proposal.Buyer)
 	if err != nil || !proposalVerified {
 			return fmt.Errorf("proposal verification failed: %v", err)
 	}
@@ -339,7 +345,7 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 	txDate := time.Unix(timestamp.Seconds, int64(timestamp.Nanos)).UTC().Format(time.RFC3339)
 
 	newHistory := History{
-			ID: "H" + generateHash(proposal.AssetID),
+			ID: "H" + GenerateHash(proposal.AssetID),
 			Type:    "transaction",
 			Record: TransactionRecord{
 					FromOrg: proposal.Seller,
@@ -366,19 +372,19 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 			return fmt.Errorf("failed to update verified transactions: %v", err)
 	}
 
-	err = putPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
 	if err != nil {
-			return err
+		return fmt.Errorf("failed to put private data: %v", err)
 	}
 
-	err = putPrivateData(ctx, "_implicit_org_"+proposal.Buyer, newHistory.ID, newHistory)
+	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+proposal.Buyer, newHistory.ID, newHistory)
 	if err != nil {
-			return err
+		return fmt.Errorf("failed to put private data: %v", err)
 	}
 
-	err = putPrivateData(ctx, "_implicit_org_"+proposal.Buyer, asset.ID, asset)
+	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+proposal.Buyer, asset.ID, asset)
 	if err != nil {
-			return err
+		return fmt.Errorf("failed to put private data: %v", err)
 	}
 
 	err = ctx.GetStub().DelPrivateData("_implicit_org_"+user, proposal.ID)
@@ -427,7 +433,7 @@ func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInter
 			return fmt.Errorf("failed to unmarshal asset JSON: %v", err)
 	}
 
-	assetID := "A" + generateHash(asset.Model+asset.Size)
+	assetID := "A" + GenerateHash(asset.Model+asset.Size)
 
 	response := ctx.GetStub().InvokeChaincode("crypto", [][]byte{[]byte("createNewAccumulator"), []byte("")}, "mychannel")
 	if response.Status != 200 {
@@ -436,7 +442,7 @@ func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInter
 	newAccumulator := string(response.Payload)
 
 	newHistory := History{
-			ID: "H" + generateHash(assetID),
+			ID: "H" + GenerateHash(assetID),
 			Type:   "add",
 			Record: AddRecord{
 					AssetID: assetID,
@@ -462,12 +468,12 @@ func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInter
 			Accumulator: updatedAccumulator,
 	}
 
-	err = putPrivateData(ctx, "_implicit_org_"+user, newAsset.ID, newAsset)
+	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newAsset.ID, newAsset)
 	if err != nil {
 			return err
 	}
 
-	err = putPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
 	if err != nil {
 			return err
 	}
@@ -490,7 +496,7 @@ func (c *AssetTransferContract) DeleteAsset(ctx contractapi.TransactionContextIn
 
 	assetID := "A" + id[1:]
 	newHistory := History {
-    ID: "H" + generateHash(assetID),
+    ID: "H" + GenerateHash(assetID),
 		Type: "delete",
 			Record: DeleteRecord {
 					ID:   assetID,
@@ -499,7 +505,7 @@ func (c *AssetTransferContract) DeleteAsset(ctx contractapi.TransactionContextIn
     	},
 }
 
-	err = putPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
 	if err != nil {
 			return err
 	}
@@ -524,7 +530,7 @@ func (c *AssetTransferContract) GetAllAssets(ctx contractapi.TransactionContextI
 			return nil, fmt.Errorf("failed to get private data by range: %v", err)
 	}
 
-	results, err := getAllResults(iterator)
+	results, err := GetAllResults(iterator)
 	if err != nil {
 			return nil, err
 	}
@@ -544,7 +550,7 @@ func (c *AssetTransferContract) GetAllHistories(ctx contractapi.TransactionConte
 			return nil, fmt.Errorf("failed to get private data by range: %v", err)
 	}
 
-	results, err := getAllResults(iterator)
+	results, err := GetAllResults(iterator)
 	if err != nil {
 			return nil, err
 	}
@@ -564,7 +570,7 @@ func (c *AssetTransferContract) GetAllProposals(ctx contractapi.TransactionConte
 			return nil, fmt.Errorf("failed to get private data by range: %v", err)
 	}
 
-	results, err := getAllResults(iterator)
+	results, err := GetAllResults(iterator)
 	if err != nil {
 			return nil, err
 	}
@@ -590,7 +596,7 @@ func (c *AssetTransferContract) VerifyTransaction(ctx contractapi.TransactionCon
 			}
 			tr.Verified = true
 			history.Record = tr
-			err = putPrivateData(ctx, "_implicit_org_"+user, history.ID, history)
+			err = c.PutPrivateData(ctx, "_implicit_org_"+user, history.ID, history)
 			if err != nil {
 					return false, err
 			}

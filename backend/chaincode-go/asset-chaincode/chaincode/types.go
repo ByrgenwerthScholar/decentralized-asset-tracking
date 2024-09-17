@@ -65,4 +65,14 @@ type ProposalMatcher interface {
 	ProposalsMatch(ctx contractapi.TransactionContextInterface, id, seller, buyer string) (bool, error)
 }
 
+type AssetVerifier interface {
+	VerifyAssetProperties(ctx contractapi.TransactionContextInterface, assetID, user, assetHash string) (bool, error)
+}
 
+type ProposalVerifier interface {
+	VerifyProposalProperties(ctx contractapi.TransactionContextInterface, proposalID, seller, buyer string) (bool, error)
+}
+
+type PrivateDataWriter interface {
+	PutPrivateData(ctx contractapi.TransactionContextInterface, collection, key string, data interface{}) error
+}
