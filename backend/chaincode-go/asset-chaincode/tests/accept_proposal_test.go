@@ -9,6 +9,7 @@ import (
     "github.com/stretchr/testify/assert"
     "asset_chaincode/chaincode"
     "asset_chaincode/mocks"
+		
 )
 
 func TestAcceptProposalSuccess(t *testing.T) {

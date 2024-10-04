@@ -29,6 +29,6 @@
       }
     ]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "network/HLEpress/src/plaid.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "network/HLEpress/src/plaid.ts", "Electron/tsconfig.json"],
   "exclude": ["node_modules", "network"]
 }

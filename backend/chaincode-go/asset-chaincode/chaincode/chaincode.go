@@ -10,7 +10,6 @@ import (
 		"strings"
     "github.com/hyperledger/fabric-contract-api-go/contractapi"
 		"github.com/hyperledger/fabric-chaincode-go/shim"
-		
 )
 
 type AssetTransferContract struct {
@@ -82,7 +81,16 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 			return fmt.Errorf("failed to invoke createNewAccumulator: %s", response.Message)
 		}
 
+		if response.Payload == nil {
+			return fmt.Errorf("failed to create new accumulator")
+		}
+
+		if len(response.Payload) == 0 {
+			return fmt.Errorf("failed to create new accumulator")
+		}
+
 		newAccumulator := string(response.Payload)
+		fmt.Print("New Accumulator: "+newAccumulator)
 
 		// Create new history record
 		newHistory := History{
@@ -112,7 +120,10 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 			return fmt.Errorf("failed to invoke createNewAccumulator: %s", response.Message)
 		}
 
+
+
 		updatedAccumulator := string(response.Payload)
+		fmt.Print("Updated Accumulator: "+updatedAccumulator)
 
 		// Create new asset
 		newAsset := Asset{
