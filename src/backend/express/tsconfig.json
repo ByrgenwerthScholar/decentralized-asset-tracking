@@ -1,0 +1,13 @@
+// src/backend/Express/tsconfig.json
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "target": "ES6",
+    "module": "commonjs"
+  },
+  "include": ["src"]
+}

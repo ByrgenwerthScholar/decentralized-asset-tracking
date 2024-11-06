@@ -1,0 +1,60 @@
+{
+  "name": "electron",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && webpack --config webpack.config.js",
+    "start": "npm run build && cross-env NODE_ENV=development electron .",
+    "package": "electron-builder"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.7",
+    "@babel/preset-env": "^7.25.7",
+    "@babel/preset-react": "^7.25.7",
+    "@babel/preset-typescript": "^7.25.7",
+    "@types/node": "^22.7.4",
+    "babel-loader": "^9.2.1",
+    "buffer": "^6.0.3",
+    "cross-env": "^7.0.3",
+    "css-loader": "^7.1.2",
+    "electron": "^32.2.1",
+    "electron-builder": "^25.1.8",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "style-loader": "^4.0.0",
+    "typescript": "^5.6.3",
+    "util": "^0.12.5",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
+  },
+  "build": {
+    "appId": "com.yourapp.id",
+    "productName": "YourAppName",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "electron/**/*",
+      "frontend/dist/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "dependencies": {
+    "chokidar": "^4.0.1",
+    "electron-reload": "^2.0.0-alpha.1",
+    "minimatch": "^3.1.2"
+  }
+}
