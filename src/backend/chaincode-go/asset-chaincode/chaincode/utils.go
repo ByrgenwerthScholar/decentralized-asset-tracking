@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"bytes"
 	"encoding/hex"
-	"strconv"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
@@ -21,10 +20,16 @@ func (c *AssetTransferContract) VerifyProposalProperties(ctx contractapi.Transac
 			return false, fmt.Errorf("error getting transient data: %v", err)
 	}
 
-	immutablePropertiesJSON := SortKeys(transMap["proposal"])
-	if immutablePropertiesJSON == nil {
+	proposalBytes := transMap["proposal"]
+	if proposalBytes == nil {
 			return false, fmt.Errorf("properties key not found in the transient map")
 	}
+
+	var proposalData interface{}
+    err = json.Unmarshal(proposalBytes, &proposalData)
+    if err != nil {
+        return false, fmt.Errorf("failed to unmarshal proposal data: %v", err)
+    }
 
 	collectionSeller := "_implicit_org_" + seller
 	collectionBuyer := "_implicit_org_" + buyer
@@ -36,7 +41,7 @@ func (c *AssetTransferContract) VerifyProposalProperties(ctx contractapi.Transac
 	if buyerHash == nil {
 			return false, fmt.Errorf("private data hash does not exist in buyer's collection: %s", proposalId)
 	}
-
+	fmt.Printf("[DEBUG] VerifyProposalProperties: Buyer's on-chain hash: %x\n", buyerHash)
 	sellerHash, err := stub.GetPrivateDataHash(collectionSeller, proposalId)
 	if err != nil {
 			return false, fmt.Errorf("failed to read private data hash from seller's collection: %v", err)
@@ -44,33 +49,21 @@ func (c *AssetTransferContract) VerifyProposalProperties(ctx contractapi.Transac
 	if sellerHash == nil {
 			return false, fmt.Errorf("private data hash does not exist in seller's collection: %s", proposalId)
 	}
-
-	jsonData, err := json.Marshal(SortKeys(immutablePropertiesJSON))
+	fmt.Printf("[DEBUG] VerifyProposalProperties: Seller's on-chain hash: %x\n", sellerHash)
+	sortedProposalData := SortKeys(proposalData)
+	jsonData, err := json.Marshal(sortedProposalData)
 	if err != nil {
 			return false, fmt.Errorf("failed to marshal JSON: %v", err)
 	}
+	fmt.Printf("[DEBUG] VerifyProposalProperties: Sorted proposal JSON: %s\n", string(jsonData))
 
 	calculatedHash := sha256.Sum256([]byte(jsonData))
-
+	fmt.Printf("[DEBUG] VerifyProposalProperties: Calculated hash: %x\n", calculatedHash)
 	if !bytes.Equal(calculatedHash[:], sellerHash) {
 			return false, fmt.Errorf("proposal hash %x does not match seller's on-chain hash %x", calculatedHash, sellerHash)
 	}
 	if !bytes.Equal(calculatedHash[:], buyerHash) {
 			return false, fmt.Errorf("proposal hash %x does not match buyer's on-chain hash %x", calculatedHash, buyerHash)
-	}
-
-	nvtAsBytes, err := stub.GetPrivateData(collectionSeller, "nvt")
-	if err != nil {
-			return false, fmt.Errorf("failed to read nvt from seller's collection: %v", err)
-	}
-
-	nvt, err := strconv.Atoi(string(nvtAsBytes))
-	if err != nil {
-			return false, fmt.Errorf("failed to convert nvt to integer: %v", err)
-	}
-
-	if nvt > 2 {
-			return false, fmt.Errorf("3 or more non-verified transactions for seller %s. Please verify past transactions before proceeding", seller)
 	}
 
 	return true, nil
@@ -119,7 +112,7 @@ func (c *AssetTransferContract) VerifyAssetProperties(ctx contractapi.Transactio
 			return false, fmt.Errorf("asset private properties hash does not exist: %s", assetID)
 	}
 
-	assetHashBytes, _ := hex.DecodeString(assetHash)
+	assetHashBytes, err := hex.DecodeString(assetHash)
 	if err != nil {
 			return false, fmt.Errorf("failed to decode proposal hash: %v", err)
 	}
@@ -135,20 +128,6 @@ func GenerateHash(input string) string {
 	h := sha256.New()
 	h.Write([]byte(input))
 	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func (c *AssetTransferContract) PutPrivateData(ctx contractapi.TransactionContextInterface, collection, key string, data interface{}) error {
-	jsonData, err := json.Marshal(SortKeys(data))
-	if err != nil {
-			return fmt.Errorf("failed to marshal data: %v", err)
-	}
-
-	err = ctx.GetStub().PutPrivateData(collection, key, jsonData)
-	if err != nil {
-			return fmt.Errorf("failed to put private data: %v", err)
-	}
-
-	return nil
 }
 
 func SortKeys(data interface{}) interface{} {
@@ -168,7 +147,11 @@ func SortKeys(data interface{}) interface{} {
 			sortedData[key] = SortKeys(v[key]) // Recursive sort for nested maps
 		}
 		return sortedData
-
+	case []interface{}:
+		for i, item := range v {
+			v[i] = SortKeys(item)
+		}
+		return v
 	default:
 		// If the value is not a map, return it as is
 		return v

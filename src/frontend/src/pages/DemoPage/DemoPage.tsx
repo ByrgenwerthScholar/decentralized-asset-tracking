@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
-import TransactionList from './MainContent/TransactionList';
+import DemoManager from './MainContent/DemoManager';
+import DemoBoard from './MainContent/DemoBoard';
 import { useAppSelector } from '../../store/hooks';
 import selectDemoImage from '../../images/select-demo.png'; // Ensure this path is correct
 
@@ -41,7 +42,10 @@ const DemoPage: React.FC = () => {
           </Typography>
         </Box>
       ) : (
-      <TransactionList />
+        <>
+          <DemoManager />
+          <DemoBoard />
+        </>
       )}
     </>
   );

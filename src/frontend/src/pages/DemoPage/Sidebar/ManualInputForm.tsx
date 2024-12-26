@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, TextField, Button, Grid } from '@mui/material';
 import { useDispatch } from 'react-redux';
-import { addTransaction } from '../../../store/slices/transactionSlice';
 import { v4 as uuidv4 } from 'uuid';
 
 const ManualInputForm: React.FC = () => {
@@ -31,7 +30,6 @@ const ManualInputForm: React.FC = () => {
         country,
         timestamp: new Date().toLocaleString(),
       };
-      dispatch(addTransaction(newTransaction));
       setFormData({ price: '', amount: '', country: '' });
     }
   };

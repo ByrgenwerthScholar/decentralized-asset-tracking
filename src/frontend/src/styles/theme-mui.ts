@@ -6,8 +6,8 @@ const theme = createTheme({
   palette: {
     mode: 'dark', // Enable dark mode
     primary: {
-      main: '#655D5F',      // Light blue for contrast in dark mode
-      dark: '#383543',
+      main: '#769D7A',      // Light blue for contrast in dark mode
+      dark: '#E3AE3C',
       light: '#E3AE3C',
       contrastText: '#000000',
     },
@@ -66,7 +66,7 @@ const theme = createTheme({
           backgroundColor: '#90caf9',
           color: '#000000',
           '&:hover': {
-            backgroundColor: '#64b5f6', // Slightly darker on hover
+            backgroundColor: '#bd8202', // Slightly darker on hover
           },
         },
         containedSecondary: {
@@ -77,11 +77,11 @@ const theme = createTheme({
           },
         },
         outlinedPrimary: {
-          borderColor: '#90caf9',
+          borderColor: '#cf9e36',
           color: '#90caf9',
           '&:hover': {
-            borderColor: '#64b5f6',
-            backgroundColor: 'rgba(144, 202, 249, 0.1)',
+            borderColor: '#E3AE3C',
+            backgroundColor: '#cf9e36',
           },
         },
       },

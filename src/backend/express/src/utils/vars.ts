@@ -1,8 +1,10 @@
 import * as path from 'path';
 import * as grpc from '@grpc/grpc-js';
 import { promises as fs } from 'fs';
-import { connect, Contract, Identity, Signer, signers } from '@hyperledger/fabric-gateway';
+import { connect, Contract, Identity, Signer, signers, Gateway } from '@hyperledger/fabric-gateway';
 import * as crypto from 'crypto';
+import * as yaml from 'yaml';
+
 const channelName = envOrDefault('CHANNEL_NAME', 'mychannel');
 const chaincodeName = envOrDefault('CHAINCODE_NAME', 'ledger');
 const mspId1 = 'Org1MSP';

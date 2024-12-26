@@ -52,6 +52,7 @@ const grpc = __importStar(require("@grpc/grpc-js"));
 const fs_1 = require("fs");
 const fabric_gateway_1 = require("@hyperledger/fabric-gateway");
 const crypto = __importStar(require("crypto"));
+const yaml = __importStar(require("yaml"));
 const channelName = envOrDefault('CHANNEL_NAME', 'mychannel');
 exports.channelName = channelName;
 const chaincodeName = envOrDefault('CHAINCODE_NAME', 'ledger');
@@ -62,6 +63,14 @@ const mspId2 = 'Org2MSP';
 exports.mspId2 = mspId2;
 const mspId3 = 'Org3MSP';
 exports.mspId3 = mspId3;
+const ccpPath = process.env.CONNECTION_PROFILE_PATH || path.resolve(__dirname, 'config', 'connection-profile.yaml');
+// Function to load the Connection Profile
+function loadConnectionProfile() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const ccpYaml = yield fs_1.promises.readFile(ccpPath, 'utf8');
+        return yaml.parse(ccpYaml);
+    });
+}
 // Path to crypto materials.
 const cryptoPath1 = envOrDefault('CRYPTO_PATH', path.resolve(__dirname, '../', '../', '../', 'fabric-samples', 'test-network', 'organizations', 'peerOrganizations', 'org1.example.com'));
 exports.cryptoPath1 = cryptoPath1;

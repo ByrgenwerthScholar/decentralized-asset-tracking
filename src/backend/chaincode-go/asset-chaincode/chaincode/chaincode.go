@@ -153,51 +153,45 @@ func (c *AssetTransferContract) InitLedger(ctx contractapi.TransactionContextInt
 		fmt.Printf("Added asset: %s %s %s\n", newAsset.ID, newAsset.Model, newAsset.Size)
 	}
 
-	// Initialize 'nvt' value
-	err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, "nvt", []byte("0"))
-	if err != nil {
-		return fmt.Errorf("failed to initialize 'nvt' value: %v", err)
-	}
-
 	fmt.Println("Initialized ledger with 10 assets.")
 	return nil
 }
 
-func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionContextInterface) error {
+func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionContextInterface) (*Proposal, error) {
     user, err := ctx.GetClientIdentity().GetMSPID()
     if err != nil {
-        return fmt.Errorf("failed to get client identity: %v", err)
+        return nil, fmt.Errorf("failed to get client identity: %v", err)
     }
 
     assetMap, err := ctx.GetStub().GetTransient()
     if err != nil {
-        return fmt.Errorf("failed to get transient data: %v", err)
+        return nil, fmt.Errorf("failed to get transient data: %v", err)
     }
 
     assetJSON, ok := assetMap["asset"]
     if !ok {
-        return fmt.Errorf("asset data not found in the transient map")
+        return nil, fmt.Errorf("asset data not found in the transient map")
     }
     var asset Asset
     err = json.Unmarshal(assetJSON, &asset)
     if err != nil {
-        return fmt.Errorf("failed to unmarshal asset JSON: %v", err)
+        return nil, fmt.Errorf("failed to unmarshal asset JSON: %v", err)
     }
 
     buyerMSP := string(assetMap["msp"])
     if buyerMSP == "" {
-        return fmt.Errorf("buyerMSP not found in the transient map")
+        return nil, fmt.Errorf("buyerMSP not found in the transient map")
     }
 
     timestamp, err := ctx.GetStub().GetTxTimestamp()
     if err != nil {
-        return fmt.Errorf("failed to get transaction timestamp: %v", err)
+        return nil, fmt.Errorf("failed to get transaction timestamp: %v", err)
     }
     txDate := time.Unix(timestamp.Seconds, int64(timestamp.Nanos)).UTC().Format(time.RFC3339)
 
     assetHash, err := ctx.GetStub().GetPrivateDataHash("_implicit_org_"+user, asset.ID)
     if err != nil {
-        return fmt.Errorf("failed to get asset hash: %v", err)
+        return nil, fmt.Errorf("failed to get asset hash: %v", err)
     }
 
     newProposal := Proposal{
@@ -224,29 +218,34 @@ func (c *AssetTransferContract) InitTransaction(ctx contractapi.TransactionConte
         AssetHash: fmt.Sprintf("%x", assetHash),
     }
 
-		ownerProposalJSON, err := json.Marshal(SortKeys(ownerProposal))
-		if err != nil {
-			return fmt.Errorf("failed to marshal owner proposal: %v", err)
-		}
+		var ownerMap map[string]interface{}
+		b, _ := json.Marshal(ownerProposal)
+		json.Unmarshal(b, &ownerMap)         // Now you have a map
+		sortedOwner := SortKeys(ownerMap)    // SortKeys now works as intended
+		ownerProposalJSON, _ := json.Marshal(sortedOwner)
 
-		newProposalJSON, err := json.Marshal(SortKeys(newProposal))
-		if err != nil {
-			return fmt.Errorf("failed to marshal new proposal: %v", err)
-		}
+		var newMap map[string]interface{}
+		b, _ = json.Marshal(newProposal)
+		json.Unmarshal(b, &newMap)         // Now you have a map
+		sortedNew := SortKeys(newMap)    // SortKeys now works as intended
+		newProposalJSON, _ := json.Marshal(sortedNew)
+		
+		fmt.Printf("[DEBUG] Owner Proposal: %s\n", string(ownerProposalJSON))
+		fmt.Printf("[DEBUG] New Proposal: %s\n", string(newProposalJSON))
 
-    err = c.PutPrivateData(ctx, "_implicit_org_"+user, ownerProposal.ID, ownerProposalJSON)
+    err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, ownerProposal.ID, ownerProposalJSON)
     if err != nil {
-        return err
+        return nil, err
     }
-    err = c.PutPrivateData(ctx, "_implicit_org_"+buyerMSP, newProposal.ID, newProposalJSON)
+    err = ctx.GetStub().PutPrivateData("_implicit_org_"+buyerMSP, newProposal.ID, newProposalJSON)
     if err != nil {
-        return err
+        return nil, err
     }
 
     eventPayload := fmt.Sprintf("Trade proposal: %s, sent from %s.", newProposal.ID, user)
     ctx.GetStub().SetEvent("ProposalFor"+buyerMSP, []byte(eventPayload))
 
-    return nil
+    return &ownerProposal, nil;
 }
 
 func (c *AssetTransferContract) AcceptProposal(ctx contractapi.TransactionContextInterface, id string) error {
@@ -257,7 +256,7 @@ func (c *AssetTransferContract) AcceptProposal(ctx contractapi.TransactionContex
 
     proposal, err := c.GetProposal(ctx, id)
     if err != nil {
-        return err
+        return err 
     }
     if proposal.Buyer != user {
         return fmt.Errorf("proposal %s can only be accepted by %s", id, proposal.Buyer)
@@ -269,8 +268,17 @@ func (c *AssetTransferContract) AcceptProposal(ctx contractapi.TransactionContex
         return fmt.Errorf("asset verification failed")
     }
 
-    proposal.Accepted = true
-    err = c.PutPrivateData(ctx, "_implicit_org_"+user, proposal.ID, proposal)
+		proposal.Accepted = true
+    propBytes, _ := json.Marshal(proposal)
+		var propMap map[string]interface{}
+		json.Unmarshal(propBytes, &propMap)
+
+		// Now apply SortKeys to the map
+		sortedProp := SortKeys(propMap)
+
+		// Marshal the sorted map
+		proposalJSON, _ := json.Marshal(sortedProp)
+    err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, proposal.ID, proposalJSON)
     if err != nil {
         return err
     }
@@ -339,6 +347,11 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 			return fmt.Errorf("failed to unmarshal proposal JSON: %v", err)
 	}
 
+	if proposal.Seller != user {
+			return fmt.Errorf("proposal %s can only be transferred by %s", proposal.ID, proposal.Seller)
+	}
+
+
 	assetVerified, err := c.AssetVerifier.VerifyAssetProperties(ctx, asset.ID, user, proposal.AssetHash)
 	if err != nil || !assetVerified {
 			return fmt.Errorf("asset verification failed: %v", err)
@@ -368,51 +381,42 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 			},
 	}
 
-	nonVerifiedTransactions, err := ctx.GetStub().GetPrivateData("_implicit_org_"+user, "nvt")
-	if err != nil {
-			return fmt.Errorf("failed to get non-verified transactions: %v", err)
-	}
+	var newMap map[string]interface{}
+	b, _ := json.Marshal(newHistory)
+	json.Unmarshal(b, &newMap)         // Now you have a map
+	sortedNew := SortKeys(newMap)    // SortKeys now works as intended
+	newHistoryJSON, _ := json.Marshal(sortedNew)
 
-	nonVerifiedCount, err := strconv.Atoi(string(nonVerifiedTransactions))
-	if err != nil {
-			return fmt.Errorf("failed to convert non-verified transactions count: %v", err)
-	}
-
-	err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, "Verified_Transactions", []byte(strconv.Itoa(nonVerifiedCount+1)))
-	if err != nil {
-			return fmt.Errorf("failed to update verified transactions: %v", err)
-	}
-
-	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+proposal.Seller, newHistory.ID, newHistoryJSON)
 	if err != nil {
 		return fmt.Errorf("failed to put private data: %v", err)
 	}
 
-	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+proposal.Buyer, newHistory.ID, newHistory)
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+proposal.Buyer, newHistory.ID, newHistoryJSON)
 	if err != nil {
 		return fmt.Errorf("failed to put private data: %v", err)
 	}
-
-	err = c.PrivateDataWriter.PutPrivateData(ctx, "_implicit_org_"+proposal.Buyer, asset.ID, asset)
+	
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+proposal.Buyer, asset.ID, assetJSON)
 	if err != nil {
 		return fmt.Errorf("failed to put private data: %v", err)
 	}
-
-	err = ctx.GetStub().DelPrivateData("_implicit_org_"+user, proposal.ID)
+	fmt.Printf("Asset %s transferred to %s\n", asset.ID, proposal.Buyer)
+	err = ctx.GetStub().DelPrivateData("_implicit_org_"+proposal.Seller, proposal.ID)
 	if err != nil {
 			return fmt.Errorf("failed to delete proposal from seller: %v", err)
 	}
-
+	fmt.Printf("Proposal %s deleted from %s\n", proposal.ID, proposal.Seller)
 	err = ctx.GetStub().DelPrivateData("_implicit_org_"+proposal.Buyer, proposal.ID)
 	if err != nil {
 			return fmt.Errorf("failed to delete proposal from buyer: %v", err)
 	}
-
-	err = ctx.GetStub().DelPrivateData("_implicit_org_"+user, proposal.AssetID)
+	fmt.Printf("Proposal %s deleted\n", proposal.ID)
+	err = ctx.GetStub().DelPrivateData("_implicit_org_"+proposal.Seller, proposal.AssetID)
 	if err != nil {
 			return fmt.Errorf("failed to delete asset from seller: %v", err)
 	}
-
+	fmt.Printf("Asset %s deleted from %s\n", proposal.AssetID, proposal.Seller)
 	eventPayload := fmt.Sprintf("Asset: %s transferred to %s.", asset.ID, proposal.Buyer)
 	ctx.GetStub().SetEvent("Transfer"+proposal.ID+"complete", []byte(eventPayload))
 
@@ -420,35 +424,35 @@ func (c *AssetTransferContract) TransferAsset(ctx contractapi.TransactionContext
 }
 
 // AddAsset adds a new asset to the ledger.
-func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInterface) error {
+func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInterface) (*Asset, error) {
 	user, err := ctx.GetClientIdentity().GetMSPID()
 	if err != nil {
-			return fmt.Errorf("failed to get client identity: %v", err)
-	}
+			return nil, fmt.Errorf("failed to get client identity: %v", err)
+	} 
 
 	timestamp, err := ctx.GetStub().GetTxTimestamp()
 	if err != nil {
-			return fmt.Errorf("failed to get transaction timestamp: %v", err)
+			return nil, fmt.Errorf("failed to get transaction timestamp: %v", err)
 	}
 	txDate := time.Unix(timestamp.Seconds, int64(timestamp.Nanos)).UTC().Format(time.RFC3339)
 
 	assetMap, err := ctx.GetStub().GetTransient()
 	if err != nil {
-			return fmt.Errorf("failed to get transient data: %v", err)
+			return nil, fmt.Errorf("failed to get transient data: %v", err)
 	}
 
 	assetJSON := assetMap["asset"]
 	var asset Asset
 	err = json.Unmarshal(assetJSON, &asset)
 	if err != nil {
-			return fmt.Errorf("failed to unmarshal asset JSON: %v", err)
+			return nil, fmt.Errorf("failed to unmarshal asset JSON: %v", err)
 	}
 
 	assetID := "A" + GenerateHash(asset.Model+asset.Size)
 
 	response := ctx.GetStub().InvokeChaincode("crypto", [][]byte{[]byte("createNewAccumulator"), []byte("")}, "mychannel")
 	if response.Status != 200 {
-			return fmt.Errorf("failed to invoke chaincode: %v", response.Message)
+			return nil, fmt.Errorf("failed to invoke chaincode: %v", response.Message)
 	}
 	newAccumulator := string(response.Payload)
 
@@ -468,7 +472,7 @@ func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInter
 
 	response = ctx.GetStub().InvokeChaincode("crypto", [][]byte{[]byte("addToAccumulator"), []byte(newAccumulator), []byte(jsonBytes)}, "mychannel")
 	if response.Status != 200 {
-			return fmt.Errorf("failed to invoke chaincode: %v", response.Message)
+			return nil, fmt.Errorf("failed to invoke chaincode: %v", response.Message)
 	}
 	updatedAccumulator := string(response.Payload)
 
@@ -478,18 +482,19 @@ func (c *AssetTransferContract) AddAsset(ctx contractapi.TransactionContextInter
 			Size:        asset.Size,
 			Accumulator: updatedAccumulator,
 	}
-
-	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newAsset.ID, newAsset)
+	newAssetJSON, err := json.Marshal(SortKeys(newAsset))
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, newAsset.ID, newAssetJSON)
 	if err != nil {
-			return err
+			return nil, err
 	}
 
-	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	newHistoryJSON, err := json.Marshal(SortKeys(newHistory))
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, newHistory.ID, newHistoryJSON)
 	if err != nil {
-			return err
+			return nil, err
 	}
 
-	return nil
+	return &newAsset, nil;
 }
 
 // DeleteAsset deletes an asset from the ledger.
@@ -516,7 +521,8 @@ func (c *AssetTransferContract) DeleteAsset(ctx contractapi.TransactionContextIn
     	},
 }
 
-	err = c.PutPrivateData(ctx, "_implicit_org_"+user, newHistory.ID, newHistory)
+	newHistoryJSON, err := json.Marshal(SortKeys(newHistory))
+	err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, newHistory.ID, newHistoryJSON)
 	if err != nil {
 			return err
 	}
@@ -590,32 +596,33 @@ func (c *AssetTransferContract) GetAllProposals(ctx contractapi.TransactionConte
 }
 
 // VerifyTransaction verifies a transaction history entry.
-func (c *AssetTransferContract) VerifyTransaction(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
-	user, err := ctx.GetClientIdentity().GetMSPID()
-	if err != nil {
-			return false, fmt.Errorf("failed to get client identity: %v", err)
-	}
+// func (c *AssetTransferContract) VerifyTransaction(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
+// 	user, err := ctx.GetClientIdentity().GetMSPID()
+// 	if err != nil {
+// 			return false, fmt.Errorf("failed to get client identity: %v", err)
+// 	}
 
-	history, err := c.GetHistory(ctx, id)
-	if err != nil {
-			return false, err
-	}
+// 	history, err := c.GetHistory(ctx, id)
+// 	if err != nil {
+// 			return false, err
+// 	}
 
-	if tr, ok := history.Record.(TransactionRecord); ok {
-			if tr.FromOrg != user {
-					return false, fmt.Errorf("transaction %s can only be verified by %s", id, tr.FromOrg)
-			}
-			tr.Verified = true
-			history.Record = tr
-			err = c.PutPrivateData(ctx, "_implicit_org_"+user, history.ID, history)
-			if err != nil {
-					return false, err
-			}
-			return true, nil
-	}
+// 	if tr, ok := history.Record.(TransactionRecord); ok {
+// 			if tr.FromOrg != user {
+// 					return false, fmt.Errorf("transaction %s can only be verified by %s", id, tr.FromOrg)
+// 			}
+// 			tr.Verified = true
+// 			history.Record = tr
+// 			historyJSON, err := json.Marshal(SortKeys(history))
+// 			err = ctx.GetStub().PutPrivateData("_implicit_org_"+user, history.ID, historyJSON)
+// 			if err != nil {
+// 					return false, err
+// 			}
+// 			return true, nil
+// 	}
 
-	return false, fmt.Errorf("history %s is not a transaction", id)
-}
+// 	return false, fmt.Errorf("history %s is not a transaction", id)
+// }
 
 // GetAsset retrieves an asset from the ledger by its ID.
 func (c *AssetTransferContract) GetAsset(ctx contractapi.TransactionContextInterface, id string) (*Asset, error) {

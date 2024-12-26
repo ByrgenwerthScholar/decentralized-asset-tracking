@@ -2,13 +2,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import demoReducer from './slices/demoSlice';
 import docsReducer from './slices/docsSlice';
-import transactionReducer from './slices/transactionSlice';
+import orgsReducer from './slices/orgsSlice';
 
 const store = configureStore({
   reducer: {
     demo: demoReducer,
     docs: docsReducer,
-    transactions: transactionReducer,
+    orgs: orgsReducer,
   },
 });
 

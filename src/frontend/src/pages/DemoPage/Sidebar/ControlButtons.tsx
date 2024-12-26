@@ -5,7 +5,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import StopIcon from '@mui/icons-material/Stop';
 import { useDispatch, useSelector } from 'react-redux';
-import { startDemo, pauseDemo, stopDemo } from '../../../store/slices/demoSlice';
+import { startDemo, pauseDemo, stopDemo, resumeDemo } from '../../../store/slices/demoSlice';
 import { RootState } from '../../../store/store';
 
 const ControlButtons: React.FC = () => {
@@ -17,11 +17,17 @@ const ControlButtons: React.FC = () => {
       <Button
         variant="contained"
         startIcon={<PlayArrowIcon />}
-        onClick={() => dispatch(startDemo())}
+        onClick={() => {
+          if (status === 'paused') {
+            dispatch(resumeDemo());
+          } else {
+            dispatch(startDemo());
+          }
+        }}
         disabled={status === 'running'}
         sx={{ mb: 1, bgcolor: 'primary.light' }}
       >
-        Start
+        {status === 'paused' ? 'Resume Demo' : 'Start Demo'}
       </Button>
       <Button
         variant="contained"

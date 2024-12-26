@@ -51,7 +51,7 @@ func TestInitTransaction(t *testing.T) {
 	stub.On("SetEvent", "ProposalForOrg2MSP", mock.Anything).Return(nil)  // Use mock.Anything here for the event payload
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx);
 
 	assert.NoError(t, err, "InitTransaction should not return an error")
 	stub.AssertCalled(t, "PutPrivateData", "_implicit_org_Org1MSP", mock.AnythingOfType("string"), mock.Anything)
@@ -71,7 +71,7 @@ func TestInitTransactionFailedClientIdentity(t *testing.T) {
 	clientIdentity.On("GetMSPID").Return("", fmt.Errorf("client identity error"))
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if GetMSPID fails")
 	assert.Contains(t, err.Error(), "failed to get client identity")
@@ -91,7 +91,7 @@ func TestInitTransactionFailedGetTransient(t *testing.T) {
 	stub.On("GetTransient").Return(map[string][]byte{}, fmt.Errorf("transient data error"))
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if GetTransient fails")
 	assert.Contains(t, err.Error(), "failed to get transient data")
@@ -112,7 +112,7 @@ func TestInitTransactionAssetDataNotFound(t *testing.T) {
 	stub.On("GetTransient").Return(transientMap, nil)
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if asset data is not found in the transient map")
 	assert.Contains(t, err.Error(), "asset data not found in the transient map")
@@ -135,7 +135,7 @@ func TestInitTransactionFailedUnmarshalAsset(t *testing.T) {
 	stub.On("GetTransient").Return(transientMap, nil)
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if unmarshal of asset JSON fails")
 	assert.Contains(t, err.Error(), "failed to unmarshal asset JSON")
@@ -157,7 +157,7 @@ func TestInitTransactionBuyerMSPNotFound(t *testing.T) {
 	stub.On("GetTransient").Return(transientMap, nil)
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if buyer MSP is not found in the transient map")
 	assert.Contains(t, err.Error(), "buyerMSP not found in the transient map")
@@ -196,7 +196,7 @@ timestamp := &timestamp.Timestamp{
 	stub.On("GetTxTimestamp").Return(timestamp, fmt.Errorf("timestamp error"))
 
 	contract := new(chaincode.AssetTransferContract)
-	err := contract.InitTransaction(ctx)
+	_, err := contract.InitTransaction(ctx)
 
 	assert.Error(t, err, "InitTransaction should return an error if GetTxTimestamp fails")
 	assert.Contains(t, err.Error(), "failed to get transaction timestamp")

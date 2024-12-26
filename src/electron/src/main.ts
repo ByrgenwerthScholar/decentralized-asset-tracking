@@ -1,116 +1,132 @@
+// src/electron/main.ts
 import { app, BrowserWindow } from 'electron';
-import * as path from 'path';
+import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import chokidar from 'chokidar';
+import waitOn from 'wait-on';
 
+let backendProcess: ChildProcess | null = null;
 
-let backendProcess: ChildProcess;
-
-if (process.env.NODE_ENV === 'development') {
-  try {
-    const electronPath = path.join(
-      __dirname,
-      '..',
-      'node_modules',
-      '.bin',
-      process.platform === 'win32' ? 'electron.cmd' : 'electron'
-    );
-
-    // Exclude electron-reload from bundling
-    const electronReload = require('electron-reload');
-
-    // Set appPath explicitly
-    const appPath = __dirname;
-
-    electronReload(appPath, {
-      electron: electronPath,
-      forceHardReset: true,
-      hardResetMethod: 'exit',
-    });
-
-    console.log('Electron executable path:', electronPath);
-  } catch (err) {
-    console.error('Failed to load electron-reload:', err);
-  }
-}
-
-function startBackend() {
-  const backendPath = path.join(__dirname, '../', '../', 'backend', 'express', 'dist', 'app.js');
+// Function to start the backend server
+function startBackend(): void {
+  const backendPath = path.join(__dirname, '../../backend/express/dist/app.js');
 
   // Kill existing backend process if running
   if (backendProcess) {
     backendProcess.kill();
+    console.log('Existing backend process killed.');
   }
 
+  // Use the current Node.js executable path
+  const nodePath = process.execPath;
+
   // Start the backend process
-  backendProcess = spawn('node', [backendPath], {
+  backendProcess = spawn(nodePath, [backendPath], {
     cwd: path.dirname(backendPath),
     stdio: 'inherit',
   });
 
-  backendProcess.on('error', (err) => {
+  backendProcess.on('error', (err: Error) => {
     console.error('Failed to start backend process:', err);
   });
 
-  backendProcess.on('close', (code) => {
+  backendProcess.on('close', (code: number) => {
     console.log(`Backend process exited with code ${code}`);
+    backendProcess = null;
   });
+
+  console.log('Backend process started.');
 }
 
-function watchBackend() {
-  const backendFile = path.join(__dirname, '../', '../', 'backend', 'express', 'dist', 'app.js');
+// Function to watch backend files and restart on changes
+function watchBackend(): void {
+  const backendFile = path.join(__dirname, '../../backend/express/dist/app.js');
 
   let restartTimeout: NodeJS.Timeout | null = null;
 
   const watcher = chokidar.watch(backendFile, { ignoreInitial: true });
 
   watcher.on('change', () => {
+    console.log(`Detected change in backend file: ${backendFile}`);
     if (restartTimeout) {
       clearTimeout(restartTimeout);
     }
     restartTimeout = setTimeout(() => {
-      console.log('Detected change in backend code. Restarting backend process...');
+      console.log('Restarting backend process...');
       startBackend();
     }, 500); // Adjust the delay as needed
   });
+
+  watcher.on('ready', () => {
+    console.log('Started watching backend files for changes.');
+  });
+
+  watcher.on('error', (error: Error) => {
+    console.error('Error watching backend files:', error);
+  });
 }
 
-
-function createWindow() {
-
+async function createWindow(): Promise<void> {
+  console.log('Starting backend server...');
   startBackend();
+  console.log('Watching backend files...');
   watchBackend();
 
-  const win = new BrowserWindow({
+  console.log('Waiting for Express server to be ready...');
+  try {
+    await waitOn({
+      resources: ['http://localhost:3000'],
+      timeout: 15000, // 15 seconds
+      interval: 100, // Check every 100ms
+    });
+    console.log('Express server is up. Loading the Electron window.');
+  } catch (err) {
+    console.error('Express server did not start in time:', err);
+    app.quit(); // Exit the app if the server isn't up
+    return;
+  }
+
+  const win: BrowserWindow = new BrowserWindow({
     width: 1024,
     height: 768,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'), // Ensure preload.js exists
+      nodeIntegration: false, // Security: Disable Node.js integration
+      contextIsolation: true, // Security: Enable context isolation
+      devTools: process.env.NODE_ENV === 'development', // Enable DevTools in development
     },
     backgroundColor: '#030637',
   });
+
+  const backendURL: string = 'http://localhost:3000'; // Express server URL
+
+  // Load the Express server URL
+  win.loadURL(backendURL);
+
+  console.log(`Electron window loaded ${backendURL}`);
+
   if (process.env.NODE_ENV === 'development') {
-    win.loadURL('http://localhost:3001'); // Ensure this matches the devServer port
-  } else {
-    win.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
+    win.webContents.openDevTools();
   }
 }
 
+// Event: When Electron is ready, create the window
 app.whenReady().then(createWindow);
 
+// Event: Quit when all windows are closed (except on macOS)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     if (backendProcess) {
       backendProcess.kill();
+      console.log('Backend process killed.');
     }
     app.quit();
   }
 });
 
+// Event: Re-create a window in the app when the dock icon is clicked and no other windows are open (macOS)
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
-

@@ -1,40 +1,49 @@
 // src/frontend/webpack.config.js
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+const webpack = require('webpack');
+
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
 module.exports = {
-  entry: './src/app.tsx',
+  mode: isDevelopment ? 'development' : 'production',
+  context: path.resolve(__dirname), // Ensure context is set to frontend directory
+  entry: [
+    isDevelopment && 'webpack-hot-middleware/client?reload=true&timeout=1000',
+    './src/index.tsx' // Entry point relative to context
+  ].filter(Boolean),
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'app.js',
-    publicPath: '/',
+    publicPath: '/', // Necessary for routing
     assetModuleFilename: 'images/[name][ext]',
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js'],
     alias: {
       '@shared': path.resolve(__dirname, '../../types/'),
-      // Ensure no alias conflicts with './styles'
     },
   },
-  node: {
-    __dirname: false,
-    __filename: false,
-  },
-  devServer: {
-    static: {
-      directory: path.resolve(__dirname, 'public'),
-    },
-    historyApiFallback: true,
-    port: 3001, // Ensure this matches the port you're using
-    hot: true,
-  },
+  devtool: isDevelopment ? 'cheap-module-source-map' : 'source-map',
   module: {
     rules: [
       {
         test: /\.(ts|tsx)$/,
         exclude: /node_modules/,
-        use: 'babel-loader',
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: [
+              '@babel/preset-env',
+              '@babel/preset-react',
+              '@babel/preset-typescript',
+            ],
+            plugins: [
+              isDevelopment && require.resolve('react-refresh/babel'),
+            ].filter(Boolean),
+          },
+        },
       },
       {
         test: /\.css$/,
@@ -48,7 +57,14 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './public/index.html',
+      template: path.resolve(__dirname, 'public', 'index.html'), // Ensure correct template path
     }),
-  ],
+    isDevelopment && new webpack.HotModuleReplacementPlugin(),
+    isDevelopment && new ReactRefreshWebpackPlugin(),
+  ].filter(Boolean),
+  watchOptions: {
+    ignored: /node_modules/,
+    aggregateTimeout: 300,
+    poll: 1000, // Enable polling for some environments
+  },
 };
